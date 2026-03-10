@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>USPACE換電維護紀錄</title>
+<link rel="manifest" href="manifest.json">
+
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;600;700&display=swap" rel="stylesheet">
+
+<style>
+body{
+font-family:'Noto Sans TC',sans-serif;
+background:#eef3f8;
+margin:0;
+color:#1b2b3a
+}
+
+header{
+background:#0d2a45;
+color:white;
+text-align:center;
+padding:20px;
+font-size:24px;
+font-weight:700;
+letter-spacing:1px;
+box-shadow:0 2px 8px rgba(0,0,0,0.15)
+}
+
+.container{padding:18px;max-width:900px;margin:auto}
+
+.card{
+background:white;
+padding:18px;
+border-radius:14px;
+margin-bottom:18px;
+box-shadow:0 6px 18px rgba(0,0,0,0.08)
+}
+
+label{
+font-size:14px;
+font-weight:600;
+color:#0d2a45
+}
+
+input,select{
+width:100%;
+max-width:320px;
+padding:10px;
+margin-top:6px;
+border:1px solid #ccd6e0;
+border-radius:8px;
+font-size:14px;
+background:white
+}
+
+button{
+padding:7px 12px;
+border:none;
+border-radius:8px;
+background:#123b63;
+color:white;
+font-size:13px;
+cursor:pointer;
+transition:0.2s
+}
+
+button:hover{background:#0d2a45}
+
+.button-row{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+
+.form-row{display:flex;gap:18px;margin-top:8px;align-items:flex-end}
+
+.field{display:flex;flex-direction:column;width:180px}
+
+.field input,.field select{width:100%;box-sizing:border-box;height:38px}
+
+.field input[type="file"]{padding:6px;height:38px}
+
+.field{display:flex;flex-direction:column}
+
+/* stats cards */
+.stats{
+display:flex;
+flex-wrap:wrap;
+gap:12px;
+margin-top:12px
+}
+
+.stat-card{
+background:#edf4fb;
+padding:10px 14px;
+border-radius:10px;
+font-size:14px;
+font-weight:600
+}
+
+.date-nav{
+display:flex;
+align-items:center;
+gap:8px
+}
+
+.date-label{
+font-weight:700;
+font-size:15px
+}
+
+/* table */
+table{
+width:100%;
+border-collapse:collapse;
+margin-top:14px
+}
+
+th,td{
+border-bottom:1px solid #e6ecf2;
+padding:10px;
+text-align:left;
+font-size:14px
+}
+
+th{
+background:#123b63;
+color:white;
+position:sticky;
+top:0
+}
+
+.thumb{
+width:42px;
+height:42px;
+object-fit:cover;
+border-radius:6px;
+cursor:pointer
+}
+
+.badge-success{
+background:#d8f5e3;
+color:#1f7a45;
+padding:4px 8px;
+border-radius:6px;
+font-size:12px;
+font-weight:600
+}
+
+.badge-fail{
+background:#ffe2e2;
+color:#b22d2d;
+padding:4px 8px;
+border-radius:6px;
+font-size:12px;
+font-weight:600
+}
+
+.delete-btn{
+background:#b22d2d
+}
+
+.delete-btn:hover{background:#8c2222}
+
+</style>
+
+</head>
+
+<body>
+
+<header>USPACE換電維護紀錄</header>
+
+<div class="container">
+
+<div class="card">
+
+<label>場域名稱</label>
+<select id="site"></select>
+
+<input type="text" id="newSite" placeholder="新增場域名稱">
+
+<div class="button-row">
+<button onclick="addSite()">新增場域</button>
+<button onclick="deleteSite()">刪除場域</button>
+</div>
+
+<label>車位號碼（可多個或區間）</label>
+<input type="text" id="spots" placeholder="例：1,2,3 或 1-9">
+
+<div class="form-row">
+<div class="field">
+<label>維護結果</label>
+<select id="status">
+<option>換電成功</option>
+<option>有車無法換電</option>
+</select>
+</div>
+
+<div class="field">
+<label>照片</label>
+<input type="file" id="photo" accept="image/*">
+</div>
+
+<div class="field">
+<label>備註</label>
+<input type="text" id="note" placeholder="可輸入現場狀況備註">
+</div>
+</div>
+
+<div class="button-row">
+<button onclick="addRecord()">新增維護紀錄</button>
+</div>
+
+</div>
+
+<div class="card">
+
+<label>搜尋場域</label>
+<input type="text" id="search" onkeyup="render()">
+
+<div class="stats">
+
+<div class="date-nav">
+<button onclick="changeDate(-1)">◀</button>
+<div class="date-label" id="currentDate"></div>
+<button onclick="changeDate(1)">▶</button>
+</div>
+
+<div class="stat-card">換電成功：<span id="successCount">0</span></div>
+<div class="stat-card">有車無法換電：<span id="failCount">0</span></div>
+
+</div>
+
+<table>
+<thead>
+<tr>
+<th>場域</th>
+<th>車位</th>
+<th>結果</th>
+<th>日期</th>
+<th>照片</th>
+<th>備註</th>
+<th>刪除</th>
+</tr>
+</thead>
+<tbody id="records"></tbody>
+</table>
+
+</div>
+
+</div>
+
+<script>
+
+let data = JSON.parse(localStorage.getItem("uspace_records")) || [];
+let sites = JSON.parse(localStorage.getItem("uspace_sites")) || ["忠孝復興場","通化夜市場","市府松仁場"];
+
+let viewDate = new Date();
+
+function formatDate(d){
+return d.toISOString().split("T")[0];
+}
+
+function changeDate(step){
+viewDate.setDate(viewDate.getDate()+step);
+render();
+}
+
+function saveSites(){
+localStorage.setItem("uspace_sites",JSON.stringify(sites));
+}
+
+function loadSites(){
+let select=document.getElementById("site");
+select.innerHTML="";
+
+sites.forEach(s=>{
+let opt=document.createElement("option");
+opt.text=s;
+select.add(opt);
+});
+}
+
+function addSite(){
+let newSite=document.getElementById("newSite").value.trim();
+if(!newSite) return;
+
+sites.push(newSite);
+saveSites();
+loadSites();
+
+document.getElementById("newSite").value="";
+}
+
+function deleteSite(){
+let site=document.getElementById("site").value;
+if(!confirm("確定刪除此場域？")) return;
+
+sites=sites.filter(s=>s!==site);
+saveSites();
+loadSites();
+}
+
+function addRecord(){
+
+let site=document.getElementById("site").value;
+let spots=document.getElementById("spots").value.trim();
+let status=document.getElementById("status").value;
+let note=document.getElementById("note").value.trim();
+let file=document.getElementById("photo").files[0];
+
+let date=formatDate(new Date());
+
+if(!spots){alert("請輸入車位號碼");return}
+
+let reader=new FileReader();
+
+reader.onload=function(e){
+
+let record={site,spots,status,date,note,photo:e.target.result};
+
+data.push(record);
+
+localStorage.setItem("uspace_records",JSON.stringify(data));
+
+render();
+
+}
+
+if(file){reader.readAsDataURL(file);}else{reader.onload({target:{result:""}})}
+
+}
+
+function deleteRecord(i){
+if(!confirm("確定刪除這筆紀錄？")) return;
+
+data.splice(i,1);
+localStorage.setItem("uspace_records",JSON.stringify(data));
+render();
+}
+
+function render(){
+
+let keyword=document.getElementById("search").value;
+let table="";
+
+let success=0;
+let fail=0;
+
+let current=formatDate(viewDate);
+
+document.getElementById("currentDate").innerText=current;
+
+ data.forEach((d,i)=>{
+
+ if(d.date===current){
+
+ if(d.status==="換電成功") success++;
+ if(d.status==="有車無法換電") fail++;
+
+ if(d.site.includes(keyword)){
+
+ let photoHTML=d.photo?`<img class="thumb" src="${d.photo}" onclick="window.open('${d.photo}')">`:"";
+
+ let statusBadge = d.status==="換電成功" 
+ ? `<span class="badge-success">${d.status}</span>`
+ : `<span class="badge-fail">${d.status}</span>`;
+
+ table+=`
+ <tr>
+ <td>${d.site}</td>
+ <td>${d.spots}</td>
+ <td>${statusBadge}</td>
+ <td>${d.date}</td>
+ <td>${photoHTML}</td>
+ <td>${d.note||""}</td>
+ <td><button class="delete-btn" onclick="deleteRecord(${i})">刪除</button></td>
+ </tr>
+ `;
+
+ }
+
+ }
+
+ });
+
+ document.getElementById("records").innerHTML=table;
+
+ document.getElementById("successCount").innerText=success;
+ document.getElementById("failCount").innerText=fail;
+
+}
+
+loadSites();
+render();
+
+</script>
+
+</body>
+</html>
